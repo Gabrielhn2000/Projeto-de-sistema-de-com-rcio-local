@@ -1,4 +1,32 @@
-from flask import Flask, render_template
+
+import sqlite3
+from flask import Flask, render_template, request, redirect
+
+def conectar_banco():
+    conexao = sqlite3.connect("açougue.db")
+    conexao.row_factory = sqlite3.Row
+    return conexao
+
+
+def criar_tabela():
+    conexao = conectar_banco()
+
+    conexao.execute("""
+        CREATE TABLE IF NOT EXISTS produtos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            preco REAL NOT NULL,
+            quantidade REAL NOT NULL
+        )
+    """)
+
+    conexao.commit()
+    conexao.close()
+
+
+criar_tabela()
+
+
 
 app = Flask(__name__)
 
@@ -6,9 +34,44 @@ app = Flask(__name__)
 def inicio():
     return render_template("index.html")
 
+
 @app.route("/produtos")
 def produtos():
-    return render_template("produtos.html")
+    conexao = conectar_banco()
+
+    lista_produtos = conexao.execute(
+        "SELECT * FROM produtos"
+    ).fetchall()
+
+    conexao.close()
+
+    return render_template(
+        "produtos.html",
+        produtos=lista_produtos
+    )
+
+
+@app.route("/produtos/novo", methods=["GET", "POST"])
+def novo_produto():
+    if request.method == "POST":
+        nome = request.form["nome"]
+        preco = float(request.form["preco"])
+        quantidade = float(request.form["quantidade"])
+
+        conexao = conectar_banco()
+
+        conexao.execute(
+            """INSERT INTO produtos (nome, preco, quantidade)
+            VALUES (?, ?, ?)""",
+            (nome, preco, quantidade)
+        )
+
+        conexao.commit()
+        conexao.close()
+
+        return redirect("/produtos")
+
+    return render_template("novo_produto.html")
 
 app.run(debug=True)
 
